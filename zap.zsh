@@ -17,7 +17,9 @@ function plug() {
     }
 
     # If the absolute is a directory then source as a local plugin
+    pushd -q "$ZAP_DIR"
     local plugin_absolute="${1:A}"
+    popd -q
     if [ -d "${plugin_absolute}" ]; then
         local plugin="${plugin_absolute}"
         local plugin_name="${plugin:t}"
@@ -78,8 +80,17 @@ function _zap_update() {
 
     local _plugin _plug _status
 
-    [[ $1 = "self" ]] && { _pull $ZAP_DIR; return }
-    [[ $1 == "all" ]] && { echo "\nUpdating All Plugins\n"; for _plug in ${ZAP_INSTALLED_PLUGINS[@]}; do _pull "$ZAP_PLUGIN_DIR/$_plug"; done; return }
+    [[ $1 == "all" || $1 == "self" ]] && {
+        _pull $ZAP_DIR
+        [[ $1 == "self" ]] && return
+    }
+    [[ $1 == "all" || $1 == "plugins" ]] && {
+        echo "\nUpdating All Plugins\n"
+        for _plug in ${ZAP_INSTALLED_PLUGINS[@]}; do
+            _pull "$ZAP_PLUGIN_DIR/$_plug"
+        done
+        return
+    }
 
     function _check() {
         git -C "$1" remote update &> /dev/null
@@ -133,16 +144,17 @@ COMMANDS:
     version        Show version information
 
 OPTIONS:
-    update self    Update Zap itself
-    update all     Update all plugins"
+    update self            Update Zap itself
+    update plugins         Update all plugins
+    update all             Update Zap and all plugins"
 }
 
 function _zap_version() {
-    local -Ar color=(BLUE "\033[1;34m" GREEN "\033[1;32m" RESET "\033[0m")
+    local -Ar color=(BLUE "\033[0;34m" GREEN "\033[0;32m" RESET "\033[0m")
     local _branch=$(git -C "$ZAP_DIR" branch --show-current)
-    local _hash=$(git -C "$ZAP_DIR" log -1 --pretty="%h")
-    local _date=$(git -C "$ZAP_DIR" log -1 --pretty="%cs")
-    echo "⚡ Zap - Version\n\nBranch: ${color[GREEN]}${_branch}${color[RESET]}\nCommit Hash: ${color[BLUE]}${_hash#g}${color[RESET]}\nCommit Date: ${color[BLUE]}${_date#g}${color[RESET]}"
+    local _version=$(git -C "$ZAP_DIR" describe --tags `git -C "$ZAP_DIR" rev-list --tags --max-count=1`)
+    local _commit=$(git -C "$ZAP_DIR" log -1 --pretty="%h (%cr)")
+    echo "⚡ Zap - Version\n\nVersion: ${color[GREEN]}${_branch}/${_version}${color[RESET]}\nCommit Hash: ${color[BLUE]}${_commit}${color[RESET]}"
 }
 
 function zap() {
